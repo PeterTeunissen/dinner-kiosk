@@ -1,0 +1,2135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+<!-- Warm, modern, highly readable -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;750;800&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+<title>Dinner Planner</title>
+
+<style>
+/* =========================================================
+   THEME SWITCH
+   Change ONE LINE in HTML: <body data-theme="recipe">
+   Options: green | farmhouse | recipe
+========================================================= */
+
+/* Base tokens (shared) */
+:root{
+  --r:20px;
+  --dimOpacity: 0.55;
+  --bg:#F6F4EF;
+  --card:#FFFFFF;
+  --text:#2B2B28;
+  --muted:#6F7368;
+  --border:#E5E1D8;
+  --shadow: 0 8px 22px rgba(43,43,40,.10);
+  --accent:#4F6F64;
+  --accentSoft: rgba(79,111,100,.14);
+  --danger:#A44A3F;
+  --dangerSoft: rgba(164,74,63,.14);
+  --ideaBg:#FBFAF7;
+}
+
+/* 🎨 Slightly greener */
+body[data-theme="recipe"]{
+  --bg:#F3F5F1;
+  --card:#FFFFFF;
+  --text:#232722;
+  --muted:#657166;
+  --border:#E1E6DE;
+  --shadow: 0 10px 26px rgba(35,39,34,.10);
+  --accent:#3F6D5A;
+  --accentSoft: rgba(63,109,90,.16);
+  --danger:#A35144;
+  --dangerSoft: rgba(163,81,68,.14);
+  --ideaBg:#FBFCFA;
+}
+
+/* 🪵 Wood / farmhouse */
+body[data-theme="farmhouse"]{
+  --bg:#F7F2E9;
+  --card:#FFFDF9;
+  --text:#2A241E;
+  --muted:#756A5E;
+  --border:#E6D9C7;
+  --shadow: 0 10px 24px rgba(42,36,30,.10);
+  --accent:#6A7B4E;
+  --accentSoft: rgba(106,123,78,.18);
+  --danger:#A4583D;
+  --dangerSoft: rgba(164,88,61,.16);
+  --ideaBg: linear-gradient(180deg,#FFFDF9,#FFF7EA);
+}
+
+/* 🍽 Recipe card */
+body[data-theme="recipe"]{
+  --bg:#F4F1EA;
+  --card:#FFFEFB;
+  --text:#262420;
+  --muted:#6C6A63;
+  --border:#E7DFD2;
+  --shadow: 0 12px 30px rgba(38,36,32,.10);
+  --accent:#4F6F64;
+  --accentSoft: rgba(79,111,100,.14);
+  --danger:#A44A3F;
+  --dangerSoft: rgba(164,74,63,.14);
+  --ideaBg: linear-gradient(180deg,#FFFEFB,#FFF7EA);
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+
+body{
+  margin:0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow:hidden; /* kiosk/tablet default */
+  touch-action:auto;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+body.dragging{ touch-action:none; overflow:hidden; }
+
+.hidden{ display:none !important; }
+
+.app{
+  height:100%;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:
+    calc(18px + env(safe-area-inset-top))
+    calc(18px + env(safe-area-inset-right))
+    calc(18px + env(safe-area-inset-bottom))
+    calc(18px + env(safe-area-inset-left));
+}
+
+/* Top bar */
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:12px;
+}
+
+.title{
+  font-size: clamp(24px, 3vw + 10px, 34px);
+  font-weight: 750;
+  letter-spacing:-.2px;
+}
+
+.topbar-right{
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+}
+
+.icon-btn{
+  border:none;
+  border-radius:14px;
+  padding:10px 12px;
+  background: var(--accentSoft);
+  color: var(--text);
+  font-weight: 650;
+  cursor:pointer;
+}
+.icon-btn:active{ transform: scale(.98); }
+
+.user-pill{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:14px;
+  background: rgba(255,255,255,.78);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.user-name{
+  font-weight:650;
+  color:var(--text);
+  max-width: 180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.user-actions{ display:flex; gap:8px; }
+
+.clock{ color:var(--muted); text-align:right; font-weight:600; }
+.clock .time{ font-size:22px; font-weight:650; color:var(--text); }
+
+/* Main layout */
+.content{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns: 3fr 1.2fr;
+  gap:14px;
+}
+
+/* LEFT */
+.left{
+  min-height:0;
+  display:grid;
+  grid-template-rows: 1fr;
+}
+
+/* Days (kiosk/tablet: always 7 visible) */
+.days{
+  min-height:0;
+  height:100%;
+  display:grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap:10px;
+}
+
+.day-row{
+  background: var(--card);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+
+  padding: clamp(8px, 1.1vh, 14px) clamp(10px, 1.2vh, 16px);
+
+  display:grid;
+  grid-template-columns: 90px 1.3fr 1.6fr 110px;
+  align-items:center;
+  gap:10px;
+
+  min-height:0;
+  touch-action: manipulation;
+  position:relative;
+  overflow:hidden;
+}
+
+/* Recipe card strip */
+body[data-theme="recipe"] .day-row::before{
+  content:"";
+  position:absolute;
+  left:0; top:0; bottom:0;
+  width:10px;
+  background: linear-gradient(180deg, rgba(79,111,100,.35), rgba(79,111,100,.08));
+}
+body[data-theme="recipe"] .day-row{
+  padding-left: calc(clamp(10px, 1.2vh, 16px) + 8px);
+}
+
+/* Farmhouse subtle paper glow */
+body[data-theme="farmhouse"] .day-row{
+  background: linear-gradient(180deg, var(--card), #FFFBF3);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.7);
+}
+
+.day-row.dragging{ opacity:.65; }
+
+.day-row.drop-target{
+  outline: 3px solid rgba(79,111,100,.30);
+  outline-offset: 2px;
+  box-shadow: 0 18px 40px rgba(43,43,40,.14);
+}
+
+.day-label{
+  font-weight:650;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.meal{
+  font-size: clamp(16px, 1.4vh + 10px, 22px);
+  font-weight:700;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  margin-top:-2px; /* pulls closer to label */
+}
+.meal.empty{ color:#A9A89F; font-weight:650; }
+
+.notes{
+  font-size: clamp(12px, 1.1vh + 7px, 16px);
+  color: var(--muted);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  opacity:.92;
+}
+
+.day-actions{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
+
+.btn{
+  border:none;
+  border-radius:12px;
+  padding: clamp(8px, 1vh, 10px) clamp(10px, 1.1vh, 12px);
+  font-size: clamp(12px, 1.0vh + 6px, 14px);
+  font-weight:650;
+  background: var(--accentSoft);
+  color: var(--text);
+}
+.btn.danger{ background: var(--dangerSoft); }
+
+/* Ideas panel */
+.ideas-panel{
+  background: var(--card);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding:14px;
+  min-height:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.ideas-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.ideas-header span{
+  font-weight:650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 12.5px;
+}
+.add{
+  border:none;
+  border-radius:12px;
+  padding:8px 12px;
+  font-weight:650;
+  background: var(--accentSoft);
+  color: var(--text);
+}
+
+.ideas{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.idea{
+  border-radius:14px;
+  background: var(--ideaBg);
+  border: 1px solid var(--border);
+  padding:10px 12px;
+  display:grid;
+  grid-template-columns: 1fr 68px;
+  gap:8px;
+  align-items:center;
+  touch-action: manipulation;
+}
+.idea.dragging{ opacity:.65; }
+
+.idea-title{
+  font-weight:650;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.idea-actions{
+  display:flex;
+  gap:6px;
+  justify-content:flex-end;
+}
+
+/* Drag ghost */
+.ghost{
+  position:fixed;
+  left:0; top:0;
+  pointer-events:none;
+  z-index:9999;
+  display:none;
+  transform: translate3d(-9999px,-9999px,0) scale(1.03);
+  opacity:.96;
+  background:#fff;
+  border-radius:14px;
+  border: 1px solid var(--border);
+  box-shadow: 0 22px 55px rgba(43,43,40,.22);
+  padding:12px 14px;
+  min-width: 260px;
+  max-width: min(620px, calc(100vw - 36px));
+}
+.ghost .g-title{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ghost .g-sub{ color:var(--muted); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:6px; }
+
+/* Modal backgrounds */
+.modal-bg{
+  position:fixed;
+  inset:0;
+  background: rgba(43,43,40,.28);
+  display:none;
+  z-index: 5000;
+}
+.modal-bg.show{ display:block; }
+
+/* Edit modal */
+.modal{
+  position:fixed;
+  left: clamp(12px, 3vw, 120px);
+  right: clamp(12px, 3vw, 120px);
+  top: clamp(12px, 6vh, 140px);
+  bottom: clamp(12px, 6vh, 140px);
+  background: #fff;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  padding: 18px;
+  display:flex;
+  flex-direction:column;
+  gap: 12px;
+  z-index: 6000;
+  box-shadow: 0 22px 55px rgba(43,43,40,.20);
+}
+
+input,textarea,select{
+  width:100%;
+  padding:12px;
+  font-size:18px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:#fff;
+  color: var(--text);
+}
+textarea{ height:140px; resize:none; }
+
+/* Toast */
+.toast{
+  position:fixed;
+  bottom:20px;
+  left:20px;
+  right:20px;
+  background:#2B2B28;
+  color:#fff;
+  padding:12px;
+  border-radius:14px;
+  font-weight:650;
+  display:none;
+  z-index: 9000;
+}
+.toast.show{ display:block; }
+
+/* Hint */
+.hint{
+  position:fixed;
+  left:50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  background: rgba(43,43,40,.92);
+  color:#fff;
+  padding:10px 16px;
+  border-radius:999px;
+  font-weight:650;
+  font-size:14px;
+  letter-spacing:.2px;
+  opacity:0;
+  pointer-events:none;
+  transition: opacity .25s ease, transform .25s ease;
+  z-index: 8500;
+}
+.hint.show{
+  opacity:1;
+  transform: translateX(-50%) translateY(-4px);
+}
+body[data-ui="tablet"] .hint,
+body[data-ui="kiosk"] .hint{ display:none; }
+
+/* Phone mode */
+body[data-ui="phone"]{ overflow:auto; }
+body[data-ui="phone"] .app{
+  height:auto;
+  min-height:100%;
+  padding:
+    calc(10px + env(safe-area-inset-top))
+    calc(12px + env(safe-area-inset-right))
+    calc(12px + env(safe-area-inset-bottom))
+    calc(12px + env(safe-area-inset-left));
+  gap:10px;
+}
+body[data-ui="phone"] .topbar{ align-items:center; }
+body[data-ui="phone"] .title{ font-size:22px; font-weight:700; }
+body[data-ui="phone"] .clock .time{ font-size:16px; font-weight:650; }
+
+body[data-ui="phone"] .content{
+  flex:0;
+  min-height:unset;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+body[data-ui="phone"] .days{
+  height:auto;
+  min-height:unset;
+  grid-template-rows:none;
+  grid-auto-rows:auto;
+  gap:8px;
+}
+body[data-ui="phone"] .day-row{
+  padding: 10px 12px;
+  border-radius: 16px;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto auto;
+  align-items:start;
+  row-gap:2px;
+}
+body[data-ui="phone"] .day-label{
+  grid-column:1;
+  grid-row:1;
+  font-size:13px;
+  line-height:1.05;
+}
+body[data-ui="phone"] .day-actions{
+  grid-column:2;
+  grid-row:1;
+}
+body[data-ui="phone"] .meal{
+  grid-column:1 / -1;
+  grid-row:2;
+  margin-top:-4px;
+  font-size:16px;
+  line-height:1.15;
+  display:-webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow:hidden;
+  white-space:normal;
+}
+body[data-ui="phone"] .notes{
+  grid-column:1 / -1;
+  grid-row:3;
+  margin-top:-2px;
+  font-size:12px;
+  line-height:1.15;
+  color:var(--muted);
+  display:-webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow:hidden;
+  white-space:normal;
+}
+body[data-ui="phone"] .btn{ padding: 7px 10px; font-size: 12px; }
+body[data-ui="phone"] .ideas-panel{ min-height:unset; max-height:none; overflow:visible; padding:12px; }
+body[data-ui="phone"] .ideas{ max-height:none; overflow:visible; gap:8px; }
+
+/* Dim overlay */
+.dim-overlay{
+  position:fixed;
+  inset:0;
+  background: #2B2B28;
+  opacity:0;
+  pointer-events:none;
+  transition: opacity 240ms ease;
+  z-index: 12000;
+}
+body.dimmed .dim-overlay{
+  opacity: var(--dimOpacity);
+  pointer-events:auto;
+}
+.dim-overlay .dim-msg{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  color: rgba(255,255,255,.86);
+  font-weight:650;
+  letter-spacing:.2px;
+  font-size: 16px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.10);
+}
+
+/* Settings / PIN / Admin UI */
+.sheet{
+  position:fixed;
+  left: clamp(10px, 3vw, 120px);
+  right: clamp(10px, 3vw, 120px);
+  top: clamp(10px, 4vh, 90px);
+  bottom: clamp(10px, 4vh, 90px);
+  background:#fff;
+  border-radius:22px;
+  border: 1px solid var(--border);
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  z-index: 7000;
+  box-shadow: 0 22px 55px rgba(43,43,40,.22);
+  min-height:0;
+  overflow:hidden;
+}
+.sheet h2{ margin:0; font-size:20px; letter-spacing:-.1px; font-weight:750; }
+
+.sheet-body{
+  flex:1;
+  min-height:0;
+  overflow:auto;
+  -webkit-overflow-scrolling: touch;
+  padding-right:6px;
+}
+
+.row{
+  display:grid;
+  grid-template-columns: 200px 1fr;
+  gap:12px;
+  align-items:center;
+}
+.row small{ color:var(--muted); display:block; margin-top:4px; font-weight:500; }
+.row .wide{ grid-column: 1 / -1; }
+
+.grid2{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+}
+.hr{ height:1px; background: var(--border); margin:4px 0; }
+
+.actions{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.pin-dots{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  margin-top:6px;
+  margin-bottom:6px;
+}
+.dot{
+  width:12px;
+  height:12px;
+  border-radius:999px;
+  background:#E6E2D9;
+}
+.dot.filled{ background: rgba(79,111,100,.85); }
+
+.keypad{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:10px;
+  margin-top:10px;
+}
+.keypad button{
+  border:none;
+  border-radius:16px;
+  padding:18px 0;
+  font-size:20px;
+  font-weight:700;
+  background: var(--accentSoft);
+  color: var(--text);
+}
+.keypad button.danger{ background: var(--dangerSoft); }
+.keypad button:active{ transform: scale(.98); }
+
+.table{
+  width:100%;
+  border-collapse: collapse;
+  overflow:hidden;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.table th, .table td{
+  border-bottom: 1px solid var(--border);
+  padding:10px;
+  text-align:left;
+  font-size:14px;
+}
+.table th{
+  color:var(--muted);
+  font-weight:650;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  font-size:12px;
+}
+.badge{
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:999px;
+  font-weight:650;
+  font-size:12px;
+  background: var(--accentSoft);
+}
+.badge.off{ background: var(--dangerSoft); }
+.mini{
+  border:none;
+  border-radius:10px;
+  padding:8px 10px;
+  font-weight:650;
+  background: var(--accentSoft);
+  color: var(--text);
+  cursor:pointer;
+}
+.mini.danger{ background: var(--dangerSoft); }
+
+body[data-ui="phone"] .sheet{
+  left: 10px; right:10px; top: 10px; bottom:10px;
+  padding:14px;
+}
+body[data-ui="phone"] .row{ grid-template-columns: 1fr; }
+
+/* AUTH overlay */
+.auth-bg{
+  position:fixed;
+  inset:0;
+  background: rgba(246,244,239,.96);
+  display:none;
+  z-index: 20000;
+}
+.auth-bg.show{ display:flex; }
+.auth{
+  margin:auto;
+  width: min(420px, calc(100vw - 24px));
+  background:#fff;
+  border-radius:22px;
+  border: 1px solid var(--border);
+  box-shadow: 0 22px 55px rgba(43,43,40,.18);
+  padding:18px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.auth h2{ margin:0; font-size:20px; font-weight:750; }
+.auth .sub{ color:var(--muted); font-weight:600; }
+.auth .err{ color:var(--danger); font-weight:650; min-height: 20px; }
+.auth .btnbar{ display:flex; gap:10px; justify-content:flex-end; }
+.auth .primary{
+  border:none;
+  border-radius:14px;
+  padding:12px 14px;
+  font-weight:650;
+  background: var(--accentSoft);
+}
+.auth .secondary{
+  border:none;
+  border-radius:14px;
+  padding:12px 14px;
+  font-weight:650;
+  background: rgba(43,43,40,.08);
+}
+</style>
+</head>
+
+<!-- ✅ ONE-LINE THEME SWITCH: green | farmhouse | recipe -->
+<body data-theme="green">
+
+<!-- Dim overlay -->
+<div class="dim-overlay" id="dimOverlay" aria-hidden="true">
+  <div class="dim-msg">Tap to wake</div>
+</div>
+
+<!-- AUTH overlay -->
+<div class="auth-bg" id="authBg" aria-hidden="true">
+  <div class="auth" role="dialog" aria-modal="true" aria-label="Sign in">
+    <h2>Sign in</h2>
+    <div class="sub">This kiosk stays signed in once you log in.</div>
+    <input id="authUser" placeholder="Username" autocomplete="username" />
+    <input id="authPass" type="password" placeholder="Password" autocomplete="current-password" />
+    <div class="err" id="authErr"></div>
+    <div class="btnbar">
+      <button class="secondary" id="authRetry" type="button">Retry</button>
+      <button class="primary" id="authLogin" type="button">Login</button>
+    </div>
+    <small style="color:var(--muted);font-weight:600;">
+      Too many failed attempts may temporarily lock sign-in. (Server should enforce lockout.)
+    </small>
+  </div>
+</div>
+
+<div class="app" id="appRoot" aria-hidden="false">
+  <div class="topbar">
+    <div class="title">Dinner Planner</div>
+
+    <div class="topbar-right">
+      <button class="icon-btn" id="openSettings" title="Settings">⚙️</button>
+
+      <div class="user-pill">
+        <div class="user-name" id="whoami">—</div>
+        <div class="user-actions">
+          <button class="icon-btn" id="openChangePw" title="Change password">🔒</button>
+          <button class="icon-btn hidden" id="openAdmin" title="Admin users">👥</button>
+          <button class="icon-btn" id="logoutBtn" title="Logout">⎋</button>
+        </div>
+      </div>
+
+      <div class="clock">
+        <div id="clockDate">—</div>
+        <div class="time" id="clockTime">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="left">
+      <div class="days" id="days"></div>
+    </div>
+
+    <div class="ideas-panel">
+      <div class="ideas-header">
+        <span>Future Ideas</span>
+        <button class="add" id="addIdea">+ Add</button>
+      </div>
+      <div class="ideas" id="ideas"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <strong id="modalDay" style="font-weight:750;"></strong>
+    <input id="modalMeal" placeholder="Meal"/>
+    <textarea id="modalNotes" placeholder="Notes"></textarea>
+    <div style="display:flex;gap:10px;margin-top:auto">
+      <button class="btn" id="save">Save</button>
+      <button class="btn danger" id="cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN Modal -->
+<div class="modal-bg" id="pinBg">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Enter PIN">
+    <h2>Enter PIN</h2>
+    <div style="color:var(--muted);font-weight:600;">Settings are protected.</div>
+
+    <div class="pin-dots" id="pinDots" aria-hidden="true">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+
+    <div class="keypad" id="keypad">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button class="danger" data-k="clear">Clear</button><button data-k="0">0</button><button class="danger" data-k="back">⌫</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn danger" id="pinCancel">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-bg" id="settingsBg">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Settings">
+    <h2>Settings</h2>
+
+    <div class="sheet-body">
+      <div class="row">
+        <div style="font-weight:700;">Week starts</div>
+        <div>
+          <select id="setWeekStart">
+            <option value="SUN">Sunday</option>
+            <option value="MON">Monday</option>
+          </select>
+          <small>Controls display order only (backend stays 1=Mon..7=Sun).</small>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <div style="font-weight:700;">Night dimming</div>
+        <div class="grid2">
+          <label style="display:flex;gap:10px;align-items:center;font-weight:650;">
+            <input type="checkbox" id="setDimEnabled" />
+            Enabled
+          </label>
+          <div></div>
+
+          <div>
+            <div style="font-weight:650;margin-bottom:6px;">Start</div>
+            <input id="setDimStart" type="time" />
+          </div>
+          <div>
+            <div style="font-weight:650;margin-bottom:6px;">End</div>
+            <input id="setDimEnd" type="time" />
+          </div>
+
+          <div>
+            <div style="font-weight:650;margin-bottom:6px;">Dim level</div>
+            <input id="setDimOpacity" type="range" min="0.10" max="0.90" step="0.05" />
+            <small id="setDimOpacityLabel"></small>
+          </div>
+
+          <div>
+            <div style="font-weight:650;margin-bottom:6px;">Re-dim after</div>
+            <input id="setDimIdle" type="number" min="1" max="60" step="1" />
+            <small>Minutes of inactivity.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <div style="font-weight:700;">Change PIN</div>
+        <div class="grid2">
+          <div>
+            <div style="font-weight:650;margin-bottom:6px;">New PIN (4 digits)</div>
+            <input id="setNewPin" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+          </div>
+          <div>
+            <div style="font-weight:650;margin-bottom:6px;">Confirm</div>
+            <input id="setNewPin2" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+          </div>
+          <div class="wide">
+            <small>PIN sync uses /api/settings/verify (server stores a hash). If verify endpoint is missing, PIN remains local.</small>
+          </div>
+        </div>
+      </div>
+
+      <div style="height: 20px;"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn danger" id="settingsClose">Close</button>
+      <button class="btn" id="settingsSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal-bg" id="pwBg">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Change password">
+    <h2>Change password</h2>
+
+    <div class="sheet-body">
+      <div style="color:var(--muted);font-weight:600;">You can change your own password.</div>
+      <div class="hr"></div>
+      <div>
+        <div style="font-weight:700;margin-bottom:6px;">Current password</div>
+        <input id="pwCurrent" type="password" autocomplete="current-password" />
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:6px;">New password</div>
+        <input id="pwNew" type="password" autocomplete="new-password" />
+        <small>Minimum 8 characters (server enforces policy).</small>
+      </div>
+      <div id="pwErr" style="color:var(--danger);font-weight:650;min-height:20px;"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn danger" id="pwClose">Close</button>
+      <button class="btn" id="pwSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Users Modal -->
+<div class="modal-bg" id="adminBg">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Admin users">
+    <h2>Users</h2>
+
+    <div class="sheet-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div style="color:var(--muted);font-weight:600;">Create users, enable/disable, reset password.</div>
+        <button class="mini" id="adminRefresh">Refresh</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div style="display:grid;grid-template-columns: 1fr 1fr 1fr;gap:10px;">
+        <div>
+          <div style="font-weight:700;margin-bottom:6px;">Username</div>
+          <input id="newU" placeholder="e.g. mom" autocomplete="off" />
+        </div>
+        <div>
+          <div style="font-weight:700;margin-bottom:6px;">Temp password</div>
+          <input id="newP" type="password" placeholder="temporary" autocomplete="new-password" />
+        </div>
+        <div>
+          <div style="font-weight:700;margin-bottom:6px;">Role</div>
+          <select id="newRole">
+            <option value="ROLE_USER">User</option>
+            <option value="ROLE_ADMIN">Admin</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="mini" id="createUser">Create</button>
+      </div>
+
+      <div id="adminErr" style="color:var(--danger);font-weight:650;min-height:20px;margin-top:8px;"></div>
+
+      <div class="hr"></div>
+
+      <table class="table" id="usersTable" aria-label="Users table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Status</th>
+            <th>Role</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="usersTbody"></tbody>
+      </table>
+
+      <div style="height:18px;"></div>
+      <small style="color:var(--muted);font-weight:600;">
+        Endpoints expected (admin-only): GET /api/users, POST /api/users, PUT /api/users/{id}/enabled, PUT /api/users/{id}/password
+      </small>
+    </div>
+
+    <div class="actions">
+      <button class="btn danger" id="adminClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Drag ghost -->
+<div class="ghost" id="ghost" aria-hidden="true">
+  <div class="g-title" id="ghostTitle">—</div>
+  <div class="g-sub" id="ghostSub">—</div>
+</div>
+
+<!-- Phone-only hint -->
+<div class="hint" id="dragHint" aria-hidden="true">
+  <span>Long-press to drag</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API="/api";
+
+/* Local fallback defaults */
+const CONFIG_DEFAULTS = {
+  weekStart: "SUN",
+  dim: { enabled:true, start:"22:30", end:"07:30", opacity:0.55, inactivityMinutes:5 },
+  pinLocal: "1234"
+};
+
+const LS_KEYS = { settings: "dinnerPlanner.settings.local" };
+
+function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
+function safeObj(x){ return (x && typeof x === "object") ? x : {}; }
+
+function loadLocalSettings(){
+  try{
+    const raw = localStorage.getItem(LS_KEYS.settings);
+    if(!raw) return structuredClone(CONFIG_DEFAULTS);
+    const p = JSON.parse(raw);
+    const s = structuredClone(CONFIG_DEFAULTS);
+    if (p.weekStart === "SUN" || p.weekStart === "MON") s.weekStart = p.weekStart;
+    if (p.dim){
+      s.dim.enabled = !!p.dim.enabled;
+      if (typeof p.dim.start === "string") s.dim.start = p.dim.start;
+      if (typeof p.dim.end === "string") s.dim.end = p.dim.end;
+      if (typeof p.dim.opacity === "number") s.dim.opacity = clamp(p.dim.opacity,0.10,0.90);
+      if (typeof p.dim.inactivityMinutes === "number") s.dim.inactivityMinutes = clamp(p.dim.inactivityMinutes,1,60);
+    }
+    if (p.pinLocal && /^\d{4}$/.test(String(p.pinLocal))) s.pinLocal = String(p.pinLocal);
+    return s;
+  }catch{
+    return structuredClone(CONFIG_DEFAULTS);
+  }
+}
+function saveLocalSettings(s){
+  localStorage.setItem(LS_KEYS.settings, JSON.stringify({
+    weekStart: s.weekStart,
+    dim: s.dim,
+    pinLocal: s.pinLocal
+  }));
+}
+
+/* Effective settings in memory */
+let SETTINGS = loadLocalSettings();
+
+/* Backend dayOfWeek assumed: 1=Mon..7=Sun */
+const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+function displayOrderFromStart(start){ return (start==="SUN") ? [7,1,2,3,4,5,6] : [1,2,3,4,5,6,7]; }
+let DISPLAY_ORDER = displayOrderFromStart(SETTINGS.weekStart);
+function dowLabel(dow){ return DOW[(Number(dow)||1)-1] ?? String(dow); }
+function orderIndex(dow){
+  const i = DISPLAY_ORDER.indexOf(Number(dow));
+  return i === -1 ? 999 : i;
+}
+
+/* DOM helpers */
+const $ = (id) => document.getElementById(id);
+const toast = (m) => {
+  const t = $("toast");
+  t.textContent=m;
+  t.classList.add("show");
+  clearTimeout(toast._tm);
+  toast._tm=setTimeout(()=>t.classList.remove("show"),2000);
+};
+
+/* API helper (AUTH: include cookies) */
+async function api(path, opts = {}){
+  const r = await fetch(API + path, {
+    credentials: "include",
+    headers: {"Content-Type":"application/json"},
+    ...opts
+  });
+  if (!r.ok) throw new Error(await r.text().catch(()=>String(r.status)));
+  return r.status === 204 ? null : r.json();
+}
+
+/* =========================================================
+   AUTH
+========================================================= */
+let AUTH = { authenticated:false, username:null, roles:[] };
+const authBg = $("authBg");
+
+function isAdmin(){
+  const roles = AUTH.roles || [];
+  return roles.includes("ROLE_ADMIN") || roles.includes("ADMIN") || roles.includes("ROLE_SUPERUSER");
+}
+function setAuthUI(){
+  $("whoami").textContent = AUTH.username || "—";
+  $("openAdmin").classList.toggle("hidden", !isAdmin());
+}
+function showAuthOverlay(on){
+  authBg.classList.toggle("show", !!on);
+  authBg.setAttribute("aria-hidden", on ? "false" : "true");
+  $("appRoot").setAttribute("aria-hidden", on ? "true" : "false");
+}
+
+/* Client-side throttle (server should enforce true lockout) */
+let loginFails = 0;
+let loginLockUntil = 0;
+
+function lockMsForFail(n){
+  if (n < 5) return 0;
+  const base = 15000;
+  const ms = base * Math.pow(2, n - 5);
+  return Math.min(ms, 300000);
+}
+function canAttemptLogin(){
+  return Date.now() >= loginLockUntil;
+}
+function setLoginError(msg){
+  $("authErr").textContent = msg || "";
+}
+function updateLoginButtons(){
+  const locked = !canAttemptLogin();
+  $("authLogin").disabled = locked;
+  $("authRetry").disabled = locked;
+  if (locked){
+    const sec = Math.ceil((loginLockUntil - Date.now())/1000);
+    setLoginError(`Try again in ${sec}s`);
+  }
+}
+
+async function authMe(){
+  try{
+    const me = await api("/auth/me", { method:"GET" });
+    if (me && me.authenticated){
+      AUTH = {
+        authenticated:true,
+        username: me.username || me.name || null,
+        roles: Array.isArray(me.roles) ? me.roles : (Array.isArray(me.authorities) ? me.authorities : [])
+      };
+      setAuthUI();
+      showAuthOverlay(false);
+      return true;
+    }
+  }catch{}
+  AUTH = { authenticated:false, username:null, roles:[] };
+  setAuthUI();
+  showAuthOverlay(true);
+  return false;
+}
+
+async function authLogin(username, password){
+  return api("/auth/login", {
+    method:"POST",
+    body: JSON.stringify({ username, password })
+  });
+}
+
+async function authLogout(){
+  try{
+    await api("/auth/logout", { method:"POST" });
+  }catch{}
+  AUTH = { authenticated:false, username:null, roles:[] };
+  setAuthUI();
+  showAuthOverlay(true);
+}
+
+$("authLogin").addEventListener("click", async () => {
+  if (!canAttemptLogin()) return;
+  setLoginError("");
+  try{
+    const u = ($("authUser").value || "").trim();
+    const p = ($("authPass").value || "");
+    if (!u || !p){
+      setLoginError("Enter username and password.");
+      return;
+    }
+
+    await authLogin(u, p);
+    loginFails = 0;
+    loginLockUntil = 0;
+
+    const ok = await authMe();
+    if (ok){
+      ensureWsStarted();
+      tickSchedule();
+      scheduleRedim();
+    }
+
+    await refreshAll().catch(()=>{});
+  }catch(err){
+    loginFails++;
+    const lock = lockMsForFail(loginFails);
+    if (lock > 0){
+      loginLockUntil = Date.now() + lock;
+    }
+    setLoginError("Invalid username or password.");
+    updateLoginButtons();
+  }
+});
+
+$("authRetry").addEventListener("click", () => {
+  updateLoginButtons();
+  if (canAttemptLogin()) setLoginError("");
+});
+
+setInterval(updateLoginButtons, 500);
+
+$("logoutBtn").addEventListener("click", async () => {
+  if (confirm("Log out of the kiosk?")){
+    await authLogout();
+  }
+});
+
+/* =========================================================
+   Settings Sync
+========================================================= */
+let remoteSettingsSupported = true;
+let remotePinVerifySupported = true;
+
+function mergeServerSettings(server){
+  const s = safeObj(server);
+  const dim = safeObj(s.dim);
+
+  if (s.weekStart === "SUN" || s.weekStart === "MON") SETTINGS.weekStart = s.weekStart;
+
+  if (typeof dim.enabled === "boolean") SETTINGS.dim.enabled = dim.enabled;
+  if (typeof dim.start === "string") SETTINGS.dim.start = dim.start;
+  if (typeof dim.end === "string") SETTINGS.dim.end = dim.end;
+  if (typeof dim.opacity === "number") SETTINGS.dim.opacity = clamp(dim.opacity, 0.10, 0.90);
+  if (typeof dim.inactivityMinutes === "number") SETTINGS.dim.inactivityMinutes = clamp(dim.inactivityMinutes, 1, 60);
+
+  DISPLAY_ORDER = displayOrderFromStart(SETTINGS.weekStart);
+  applyDimVars();
+  tickSchedule();
+  scheduleRedim();
+  saveLocalSettings(SETTINGS);
+}
+
+let settingsLoadInFlight = null;
+async function loadSettingsRemote(){
+  if (settingsLoadInFlight) return settingsLoadInFlight;
+  settingsLoadInFlight = (async () => {
+    if (!remoteSettingsSupported) return;
+    try{
+      const s = await api("/settings", { method:"GET" });
+      mergeServerSettings(s);
+    }catch(err){
+      remoteSettingsSupported = false;
+    }
+  })().finally(() => { settingsLoadInFlight = null; });
+  return settingsLoadInFlight;
+}
+
+async function saveSettingsRemote(payload){
+  if (!remoteSettingsSupported) return false;
+  try{
+    await api("/settings", { method:"PUT", body: JSON.stringify(payload) });
+    return true;
+  }catch(err){
+    remoteSettingsSupported = false;
+    return false;
+  }
+}
+
+async function verifyPin(pin){
+  if (remoteSettingsSupported && remotePinVerifySupported){
+    try{
+      const res = await api("/settings/verify", { method:"POST", body: JSON.stringify({ pin }) });
+      if (res && typeof res.ok === "boolean") return res.ok;
+      return (pin === SETTINGS.pinLocal);
+    }catch(err){
+      remotePinVerifySupported = false;
+      return (pin === SETTINGS.pinLocal);
+    }
+  }
+  return (pin === SETTINGS.pinLocal);
+}
+
+/* =========================================================
+   UI Mode
+========================================================= */
+function detectUIMode(){
+  const w = window.innerWidth;
+  if (w <= 900) return "phone";
+  if (w <= 1200) return "tablet";
+  return "kiosk";
+}
+function applyUIMode(){
+  const mode = detectUIMode();
+  if (document.body.dataset.ui !== mode) document.body.dataset.ui = mode;
+}
+applyUIMode();
+window.addEventListener("resize", applyUIMode, { passive:true });
+window.addEventListener("orientationchange", applyUIMode, { passive:true });
+if ("ResizeObserver" in window){
+  const ro = new ResizeObserver(() => applyUIMode());
+  ro.observe(document.documentElement);
+}
+
+function longPressMs(){
+  const ui = document.body.dataset.ui;
+  if (ui === "kiosk") return 120;
+  if (ui === "tablet") return 200;
+  return 300;
+}
+
+/* Hint */
+const HINT_KEY = "dinnerPlanner.dragHintSeen";
+function showDragHint(){
+  if (document.body.dataset.ui !== "phone") return;
+  if (sessionStorage.getItem(HINT_KEY)) return;
+  $("dragHint").classList.add("show");
+  setTimeout(() => hideDragHint(true), 4000);
+}
+function hideDragHint(markSeen){
+  $("dragHint").classList.remove("show");
+  if (markSeen){
+    sessionStorage.setItem(HINT_KEY, "1");
+  }
+}
+
+/* Haptics */
+function haptic(kind){
+  if (!("vibrate" in navigator)) return;
+  if (kind === "start") navigator.vibrate(12);
+  if (kind === "drop") navigator.vibrate([10,40,10]);
+}
+
+/* Ghost snap */
+function snapGhostToTarget(targetEl){
+  return new Promise((resolve) => {
+    const g = $("ghost");
+    if (!g || !targetEl) return resolve();
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return resolve();
+
+    const rect = targetEl.getBoundingClientRect();
+    const x = rect.right - 140;
+    const y = rect.top + rect.height / 2 - 18;
+
+    g.style.transition = "transform 180ms ease-out, opacity 180ms ease-out";
+    g.style.transform = `translate3d(${x}px, ${y}px, 0) scale(0.98)`;
+    g.style.opacity = "0.65";
+
+    setTimeout(() => {
+      g.style.transition = "";
+      g.style.opacity = "";
+      resolve();
+    }, 190);
+  });
+}
+
+/* =========================================================
+   Data load + render
+========================================================= */
+let week = [];
+let ideas = [];
+let editDow = null;
+
+let loadInFlight = null;
+async function loadData(){
+  if (loadInFlight) return loadInFlight;
+  loadInFlight = (async () => {
+    const [w, i] = await Promise.all([ api("/week"), api("/ideas") ]);
+    week = w || [];
+    ideas = i || [];
+    render();
+  })().finally(() => { loadInFlight = null; });
+  return loadInFlight;
+}
+
+function safeText(s){ return (s ?? "").toString(); }
+
+function render(){
+  const days = $("days");
+  days.innerHTML = "";
+  week.slice().sort((a,b)=> orderIndex(a.dayOfWeek) - orderIndex(b.dayOfWeek)).forEach(d => {
+    const row = document.createElement("div");
+    row.className = "day-row";
+    row.dataset.dow = String(d.dayOfWeek);
+    row.dataset.dragType = "day";
+    row.innerHTML = `
+      <div class="day-label">${dowLabel(d.dayOfWeek)}</div>
+      <div class="meal ${d.mealTitle ? "" : "empty"}">${safeText(d.mealTitle || "—")}</div>
+      <div class="notes">${safeText(d.notes || "")}</div>
+      <div class="day-actions">
+        <button class="btn" data-edit="${d.dayOfWeek}" title="Edit">✏️</button>
+        <button class="btn danger" data-clear="${d.dayOfWeek}" title="Clear">🗑</button>
+      </div>
+    `;
+    days.appendChild(row);
+  });
+
+  const ideasEl = $("ideas");
+  ideasEl.innerHTML = "";
+  ideas.forEach(i => {
+    const el = document.createElement("div");
+    el.className = "idea";
+    el.dataset.ideaId = String(i.id);
+    el.dataset.dragType = "idea";
+    el.innerHTML = `
+      <div class="idea-title">${safeText(i.title || "")}</div>
+      <div class="idea-actions">
+        <button class="btn danger" data-del="${i.id}" title="Delete">🗑</button>
+      </div>
+    `;
+    ideasEl.appendChild(el);
+  });
+}
+
+/* =========================================================
+   Night dimming (not logout) + SYNC ON WAKE
+========================================================= */
+const dimOverlay = $("dimOverlay");
+function applyDimVars(){
+  document.documentElement.style.setProperty("--dimOpacity", String(SETTINGS.dim.opacity ?? 0.55));
+}
+applyDimVars();
+
+let lastActivityTs = Date.now();
+let dimTimer = null;
+
+function parseHHMM(str){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(str||"").trim());
+  if (!m) return { h:0, m:0 };
+  return { h: clamp(Number(m[1]),0,23), m: clamp(Number(m[2]),0,59) };
+}
+function minutesSinceMidnight(d){ return d.getHours()*60 + d.getMinutes(); }
+function inDimWindow(now = new Date()){
+  if (!SETTINGS.dim.enabled) return false;
+  const s = parseHHMM(SETTINGS.dim.start);
+  const e = parseHHMM(SETTINGS.dim.end);
+  const startMin = s.h*60 + s.m;
+  const endMin   = e.h*60 + e.m;
+  const cur      = minutesSinceMidnight(now);
+  if (startMin <= endMin) return (cur >= startMin && cur < endMin);
+  return (cur >= startMin || cur < endMin);
+}
+function isDimmed(){ return document.body.classList.contains("dimmed"); }
+function setDimmed(on){
+  if (on) document.body.classList.add("dimmed");
+  else document.body.classList.remove("dimmed");
+}
+function clearDimTimer(){
+  if (dimTimer) clearTimeout(dimTimer);
+  dimTimer = null;
+}
+function scheduleRedim(){
+  clearDimTimer();
+  if (!SETTINGS.dim.enabled) return;
+  if (!inDimWindow()) { setDimmed(false); return; }
+
+  const ms = Math.max(5_000, (SETTINGS.dim.inactivityMinutes || 5) * 60_000);
+  dimTimer = setTimeout(() => {
+    if (inDimWindow()) setDimmed(true);
+  }, ms);
+}
+function tickSchedule(){
+  if (!SETTINGS.dim.enabled) { setDimmed(false); clearDimTimer(); return; }
+  if (inDimWindow()){
+    const msInactive = Date.now() - lastActivityTs;
+    const threshold = (SETTINGS.dim.inactivityMinutes || 5) * 60_000;
+    if (msInactive >= threshold) setDimmed(true);
+    scheduleRedim();
+  }else{
+    setDimmed(false);
+    clearDimTimer();
+  }
+}
+
+/* =========================================================
+   Refresh safety + pending refresh flag (for dim/drag/auth)
+========================================================= */
+let pendingRefresh = false;
+let isRefreshing = false;
+
+async function refreshAllSafe(){
+  if (isRefreshing) return;
+  isRefreshing = true;
+  try{
+    await refreshAll();
+  } finally {
+    isRefreshing = false;
+  }
+}
+
+function recordActivity(){
+  lastActivityTs = Date.now();
+  const wasDimmed = isDimmed();
+  if (wasDimmed) setDimmed(false);
+
+  scheduleRedim();
+
+  // catch up after wake/idle
+  if (!isDimmed() && pendingRefresh && !drag && !authBg.classList.contains("show")){
+    pendingRefresh = false;
+    refreshAllSafe().catch(console.error);
+  }
+}
+
+dimOverlay.addEventListener("pointerdown", async (e) => {
+  if (isDimmed()){
+    e.preventDefault(); e.stopPropagation();
+    setDimmed(false);
+    recordActivity();
+
+    if (pendingRefresh && !drag && !authBg.classList.contains("show")){
+      pendingRefresh = false;
+      await refreshAllSafe().catch(console.error);
+      toast("Synced");
+    }
+  }
+}, { passive:false });
+
+["keydown","mousemove","touchstart","wheel"].forEach(evt => {
+  window.addEventListener(evt, () => recordActivity(), { passive:true });
+});
+setInterval(tickSchedule, 30_000);
+
+/* =========================================================
+   Settings UI (PIN protected)
+========================================================= */
+const pinBg = $("pinBg");
+const settingsBg = $("settingsBg");
+let pinEntry = "";
+
+function updatePinDots(){
+  const dots = $("pinDots").querySelectorAll(".dot");
+  dots.forEach((d, i) => d.classList.toggle("filled", i < pinEntry.length));
+}
+
+function showPin(){
+  pinEntry = "";
+  updatePinDots();
+  pinBg.classList.add("show");
+}
+function hidePin(){ pinBg.classList.remove("show"); }
+
+function showSettings(){
+  $("setWeekStart").value = SETTINGS.weekStart;
+  $("setDimEnabled").checked = !!SETTINGS.dim.enabled;
+  $("setDimStart").value = SETTINGS.dim.start || "22:30";
+  $("setDimEnd").value = SETTINGS.dim.end || "07:30";
+  $("setDimOpacity").value = String(SETTINGS.dim.opacity ?? 0.55);
+  $("setDimOpacityLabel").textContent = `${Math.round((SETTINGS.dim.opacity ?? 0.55)*100)}%`;
+  $("setDimIdle").value = String(SETTINGS.dim.inactivityMinutes ?? 5);
+  $("setNewPin").value = "";
+  $("setNewPin2").value = "";
+  settingsBg.classList.add("show");
+}
+function hideSettings(){ settingsBg.classList.remove("show"); }
+
+$("openSettings").addEventListener("click", async () => {
+  recordActivity();
+  if (isDimmed()) return;
+  await loadSettingsRemote().catch(()=>{});
+  showPin();
+});
+
+$("pinCancel").addEventListener("click", () => hidePin());
+
+$("keypad").addEventListener("click", async (e) => {
+  const k = e.target?.dataset?.k;
+  if (!k) return;
+
+  recordActivity();
+
+  if (k === "clear"){ pinEntry = ""; updatePinDots(); return; }
+  if (k === "back"){ pinEntry = pinEntry.slice(0,-1); updatePinDots(); return; }
+  if (!/^\d$/.test(k)) return;
+
+  if (pinEntry.length >= 4) return;
+  pinEntry += k;
+  updatePinDots();
+
+  if (pinEntry.length === 4){
+    const ok = await verifyPin(pinEntry);
+    if (ok){
+      hidePin();
+      showSettings();
+    }else{
+      pinEntry = "";
+      updatePinDots();
+      toast("Wrong PIN");
+      haptic("start");
+    }
+  }
+});
+
+$("settingsClose").addEventListener("click", () => hideSettings());
+
+$("setDimOpacity").addEventListener("input", () => {
+  const v = Number($("setDimOpacity").value);
+  $("setDimOpacityLabel").textContent = `${Math.round(v*100)}%`;
+});
+
+/* tap outside to close */
+pinBg.addEventListener("click", (e) => { if (e.target === pinBg) hidePin(); });
+settingsBg.addEventListener("click", (e) => { if (e.target === settingsBg) hideSettings(); });
+
+$("settingsSave").addEventListener("click", async () => {
+  const ws = $("setWeekStart").value === "MON" ? "MON" : "SUN";
+  const dimEnabled = $("setDimEnabled").checked;
+  const dimStart = ($("setDimStart").value || "22:30");
+  const dimEnd   = ($("setDimEnd").value || "07:30");
+  const dimOpacity = clamp(Number($("setDimOpacity").value || 0.55), 0.10, 0.90);
+  const dimIdle = clamp(Number($("setDimIdle").value || 5), 1, 60);
+
+  const p1 = ($("setNewPin").value || "").trim();
+  const p2 = ($("setNewPin2").value || "").trim();
+  let pinToSet = null;
+  if (p1 || p2){
+    if (!/^\d{4}$/.test(p1) || p1 !== p2){
+      toast("PIN must be 4 digits and match.");
+      return;
+    }
+    pinToSet = p1;
+  }
+
+  SETTINGS.weekStart = ws;
+  SETTINGS.dim.enabled = dimEnabled;
+  SETTINGS.dim.start = dimStart;
+  SETTINGS.dim.end = dimEnd;
+  SETTINGS.dim.opacity = dimOpacity;
+  SETTINGS.dim.inactivityMinutes = dimIdle;
+  if (!remotePinVerifySupported && pinToSet) SETTINGS.pinLocal = pinToSet;
+
+  saveLocalSettings(SETTINGS);
+  DISPLAY_ORDER = displayOrderFromStart(SETTINGS.weekStart);
+  applyDimVars();
+  tickSchedule();
+  scheduleRedim();
+  render();
+
+  const payload = {
+    weekStart: ws,
+    dim: { enabled: dimEnabled, start: dimStart, end: dimEnd, opacity: dimOpacity, inactivityMinutes: dimIdle }
+  };
+  if (pinToSet) payload.pin = pinToSet;
+
+  const ok = await saveSettingsRemote(payload);
+
+  hideSettings();
+  toast(ok ? "Settings saved (synced)" : "Settings saved (local only)");
+});
+
+/* =========================================================
+   Change Password
+========================================================= */
+const pwBg = $("pwBg");
+function showPw(){ $("pwErr").textContent=""; $("pwCurrent").value=""; $("pwNew").value=""; pwBg.classList.add("show"); }
+function hidePw(){ pwBg.classList.remove("show"); }
+
+$("openChangePw").addEventListener("click", () => {
+  recordActivity();
+  if (isDimmed()) return;
+  showPw();
+});
+$("pwClose").addEventListener("click", hidePw);
+pwBg.addEventListener("click", (e) => { if (e.target === pwBg) hidePw(); });
+
+$("pwSave").addEventListener("click", async () => {
+  $("pwErr").textContent = "";
+  const cur = $("pwCurrent").value || "";
+  const nw = ($("pwNew").value || "").trim();
+  if (!cur || !nw){
+    $("pwErr").textContent = "Fill in both fields.";
+    return;
+  }
+  try{
+    await api("/auth/change-password", {
+      method:"POST",
+      body: JSON.stringify({ currentPassword: cur, newPassword: nw })
+    });
+    hidePw();
+    toast("Password changed");
+  }catch(err){
+    $("pwErr").textContent = "Could not change password.";
+  }
+});
+
+/* =========================================================
+   Admin Users
+========================================================= */
+const adminBg = $("adminBg");
+let adminUsers = [];
+
+function showAdmin(){ $("adminErr").textContent=""; adminBg.classList.add("show"); }
+function hideAdmin(){ adminBg.classList.remove("show"); }
+
+$("openAdmin").addEventListener("click", async () => {
+  recordActivity();
+  if (isDimmed()) return;
+  showAdmin();
+  await adminRefreshUsers().catch(()=>{});
+});
+$("adminClose").addEventListener("click", hideAdmin);
+adminBg.addEventListener("click", (e) => { if (e.target === adminBg) hideAdmin(); });
+
+$("adminRefresh").addEventListener("click", () => adminRefreshUsers().catch(()=>{}));
+
+async function adminRefreshUsers(){
+  $("adminErr").textContent = "";
+  try{
+    const list = await api("/users", { method:"GET" });
+    adminUsers = Array.isArray(list) ? list : [];
+    renderUsersTable();
+  }catch(err){
+    $("adminErr").textContent = "Cannot load users (requires admin endpoints).";
+  }
+}
+
+function userRole(u){
+  if (Array.isArray(u.roles) && u.roles.length) return u.roles[0];
+  if (typeof u.role === "string") return u.role;
+  return "ROLE_USER";
+}
+
+function renderUsersTable(){
+  const tb = $("usersTbody");
+  tb.innerHTML = "";
+  adminUsers.forEach(u => {
+    const tr = document.createElement("tr");
+    const enabled = (u.enabled === undefined) ? true : !!u.enabled;
+    const role = userRole(u);
+    tr.innerHTML = `
+      <td>${safeText(u.username || "")}</td>
+      <td><span class="badge ${enabled ? "" : "off"}">${enabled ? "Enabled" : "Disabled"}</span></td>
+      <td>${safeText(role)}</td>
+      <td style="text-align:right;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+        <button class="mini" data-en="${u.id}" data-val="${enabled ? "0" : "1"}">${enabled ? "Disable" : "Enable"}</button>
+        <button class="mini" data-rp="${u.id}">Reset PW</button>
+      </td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+$("createUser").addEventListener("click", async () => {
+  $("adminErr").textContent = "";
+  const username = ($("newU").value || "").trim();
+  const password = ($("newP").value || "");
+  const role = $("newRole").value || "ROLE_USER";
+  if (!username || !password){
+    $("adminErr").textContent = "Username and temp password required.";
+    return;
+  }
+  try{
+    await api("/users", {
+      method:"POST",
+      body: JSON.stringify({ username, password, roles:[role], enabled:true })
+    });
+    $("newU").value = "";
+    $("newP").value = "";
+    toast("User created");
+    await adminRefreshUsers();
+  }catch(err){
+    $("adminErr").textContent = "Could not create user (check server).";
+  }
+});
+
+$("usersTbody").addEventListener("click", async (e) => {
+  const enId = e.target?.dataset?.en;
+  const val = e.target?.dataset?.val;
+  const rpId = e.target?.dataset?.rp;
+
+  if (enId){
+    try{
+      await api(`/users/${enId}/enabled`, {
+        method:"PUT",
+        body: JSON.stringify({ enabled: val === "1" })
+      });
+      await adminRefreshUsers();
+      toast("Updated");
+    }catch{
+      $("adminErr").textContent = "Cannot update user status.";
+    }
+  }
+
+  if (rpId){
+    const np = prompt("New temporary password:");
+    if (!np) return;
+    try{
+      await api(`/users/${rpId}/password`, {
+        method:"PUT",
+        body: JSON.stringify({ password: np })
+      });
+      toast("Password reset");
+    }catch{
+      $("adminErr").textContent = "Cannot reset password.";
+    }
+  }
+});
+
+/* =========================================================
+   Edit/Clear/Delete/Add
+========================================================= */
+document.addEventListener("click", async (e) => {
+  if (drag) return;
+  if (isDimmed()) return;
+  if (authBg.classList.contains("show")) return;
+
+  recordActivity();
+
+  const edit = e.target.dataset.edit;
+  if (edit){
+    editDow = Number(edit);
+    const d = week.find(x => x.dayOfWeek === editDow);
+    $("modalDay").textContent = dowLabel(editDow);
+    $("modalMeal").value = d?.mealTitle || "";
+    $("modalNotes").value = d?.notes || "";
+    $("modalBg").classList.add("show");
+    return;
+  }
+
+  const clr = e.target.dataset.clear;
+  if (clr){
+    await api("/day/" + clr, { method:"DELETE" });
+    await loadData();
+    toast("Cleared");
+    return;
+  }
+
+  const del = e.target.dataset.del;
+  if (del){
+    if (confirm("Delete idea?")){
+      await api("/ideas/" + del, { method:"DELETE" });
+      await loadData();
+      toast("Deleted");
+    }
+    return;
+  }
+});
+
+$("save").onclick = async () => {
+  await api("/day", {
+    method:"PUT",
+    body: JSON.stringify({
+      dayOfWeek: editDow,
+      mealTitle: $("modalMeal").value.trim(),
+      notes: $("modalNotes").value.trim()
+    })
+  });
+  $("modalBg").classList.remove("show");
+  await loadData();
+  toast("Saved");
+};
+$("cancel").onclick = () => $("modalBg").classList.remove("show");
+
+$("addIdea").onclick = async () => {
+  if (isDimmed()) return;
+  const t = prompt("New idea");
+  if (!t) return;
+  const title = t.trim();
+  if (!title) return;
+
+  await api("/ideas", { method:"POST", body: JSON.stringify({ title }) });
+  await loadData();
+  toast("Idea added");
+};
+
+/* =========================================================
+   WebSockets — queued refresh while dimmed/dragging/auth
+========================================================= */
+let stompClient = null;
+let wsRefreshTimer = null;
+
+let wsStarted = false;
+function ensureWsStarted(){
+  if (wsStarted) return;
+  wsStarted = true;
+  connectWs();
+}
+
+async function refreshAll(){
+  await loadSettingsRemote().catch(()=>{});
+  await loadData().catch(()=>{});
+}
+
+function connectWs(){
+  const socket = new SockJS("/ws");
+  stompClient = Stomp.over(socket);
+  stompClient.debug = null;
+
+  stompClient.connect({}, () => {
+    stompClient.subscribe("/topic/ui", () => {
+      if (wsRefreshTimer) clearTimeout(wsRefreshTimer);
+      wsRefreshTimer = setTimeout(() => {
+        wsRefreshTimer = null;
+
+        if (drag || isDimmed() || authBg.classList.contains("show")){
+          pendingRefresh = true;
+          return;
+        }
+
+        refreshAllSafe().catch(console.error);
+      }, 350);
+    });
+  }, () => {
+    setTimeout(connectWs, 1500);
+  });
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && !authBg.classList.contains("show")){
+    pendingRefresh = false;
+    refreshAllSafe().catch(console.error);
+  }
+});
+
+/* =========================================================
+   Drag & drop (long press)
+========================================================= */
+let drag = null;         // { type:"idea"|"day", ideaId?, fromDow?, mealTitle, notes }
+let dragPointerId = null;
+let pressTimer = null;
+let pressStart = null;
+const MOVE_CANCEL_PX = 12;
+
+function showGhost(show){ $("ghost").style.display = show ? "block" : "none"; }
+function moveGhost(x,y){ $("ghost").style.transform = `translate3d(${x+14}px, ${y+14}px, 0) scale(1.03)`; }
+function setGhost(title, sub){
+  $("ghostTitle").textContent = title || "—";
+  $("ghostSub").textContent = sub || "";
+}
+function clearDropTargets(){
+  document.querySelectorAll(".day-row.drop-target").forEach(el => el.classList.remove("drop-target"));
+}
+function dayRowAtPoint(x,y){
+  const el = document.elementFromPoint(x,y);
+  return el ? el.closest(".day-row") : null;
+}
+function beginDrag(pointerId, x, y){
+  dragPointerId = pointerId;
+  document.body.classList.add("dragging");
+  showGhost(true);
+  moveGhost(x,y);
+}
+function endDragCleanup(){
+  showGhost(false);
+  clearDropTargets();
+  document.querySelectorAll(".dragging").forEach(el => el.classList.remove("dragging"));
+  document.body.classList.remove("dragging");
+  drag = null;
+  dragPointerId = null;
+}
+
+function startDragFromIdea(ideaEl, pointerId, x, y){
+  const id = Number(ideaEl.dataset.ideaId);
+  const idea = ideas.find(it => it.id === id);
+  if (!idea) return;
+
+  drag = { type:"idea", ideaId:id, mealTitle: idea.title || "", notes:"" };
+  ideaEl.classList.add("dragging");
+  setGhost(drag.mealTitle, "Drop on a day (notes cleared)");
+  beginDrag(pointerId, x, y);
+  haptic("start");
+  hideDragHint(true);
+  ideaEl.setPointerCapture(pointerId);
+}
+
+function startDragFromDay(dayEl, pointerId, x, y){
+  const fromDow = Number(dayEl.dataset.dow);
+  const d = week.find(w => w.dayOfWeek === fromDow);
+  if (!d) return;
+
+  drag = { type:"day", fromDow, mealTitle: d.mealTitle || "", notes: d.notes || "" };
+  dayEl.classList.add("dragging");
+  setGhost(drag.mealTitle || "—", `Move from ${dowLabel(fromDow)}`);
+  beginDrag(pointerId, x, y);
+  haptic("start");
+  hideDragHint(true);
+  dayEl.setPointerCapture(pointerId);
+}
+
+function scheduleLongPress(e, kind, el){
+  if (isDimmed()) return;
+  if (authBg.classList.contains("show")) return;
+  if (e.target.closest("button")) return;
+  if ($("modalBg").classList.contains("show")) return;
+  if (pinBg.classList.contains("show")) return;
+  if (settingsBg.classList.contains("show")) return;
+  if (pwBg.classList.contains("show")) return;
+  if (adminBg.classList.contains("show")) return;
+
+  pressStart = { x: e.clientX, y: e.clientY };
+  dragPointerId = e.pointerId;
+
+  pressTimer = setTimeout(() => {
+    pressTimer = null;
+    if (kind === "idea") startDragFromIdea(el, e.pointerId, e.clientX, e.clientY);
+    if (kind === "day")  startDragFromDay(el,  e.pointerId, e.clientX, e.clientY);
+  }, longPressMs());
+}
+function cancelLongPress(){
+  if (pressTimer) clearTimeout(pressTimer);
+  pressTimer = null;
+  pressStart = null;
+  dragPointerId = null;
+}
+
+async function applyDropToDay(targetDow){
+  const mealTitle = drag.mealTitle ?? "";
+  const notes = (drag.type === "idea") ? "" : (drag.notes ?? "");
+
+  await api("/day", {
+    method:"PUT",
+    body: JSON.stringify({ dayOfWeek: targetDow, mealTitle, notes })
+  });
+
+  if (drag.type === "day" && drag.fromDow && drag.fromDow !== targetDow){
+    await api("/day/" + drag.fromDow, { method:"DELETE" });
+  }
+}
+
+document.addEventListener("pointerdown", (e) => {
+  recordActivity();
+  if (isDimmed()) return;
+  if (authBg.classList.contains("show")) return;
+
+  const ideaEl = e.target.closest(".idea");
+  if (ideaEl && ideaEl.dataset.ideaId){
+    scheduleLongPress(e, "idea", ideaEl);
+    return;
+  }
+  const dayEl = e.target.closest(".day-row");
+  if (dayEl && dayEl.dataset.dow){
+    scheduleLongPress(e, "day", dayEl);
+  }
+}, { passive:true });
+
+document.addEventListener("pointermove", (e) => {
+  if (pressTimer && pressStart && e.pointerId === dragPointerId){
+    const dx = e.clientX - pressStart.x;
+    const dy = e.clientY - pressStart.y;
+    if (Math.hypot(dx,dy) > MOVE_CANCEL_PX) cancelLongPress();
+    return;
+  }
+  if (!drag || e.pointerId !== dragPointerId) return;
+
+  moveGhost(e.clientX, e.clientY);
+  const target = dayRowAtPoint(e.clientX, e.clientY);
+  clearDropTargets();
+  if (target) target.classList.add("drop-target");
+});
+
+document.addEventListener("pointerup", async (e) => {
+  if (pressTimer && e.pointerId === dragPointerId){
+    cancelLongPress();
+    return;
+  }
+  if (!drag || e.pointerId !== dragPointerId) return;
+
+  const target = dayRowAtPoint(e.clientX, e.clientY);
+
+  try{
+    if (target){
+      const targetDow = Number(target.dataset.dow);
+      if (drag.type === "day" && drag.fromDow === targetDow){
+        endDragCleanup();
+        return;
+      }
+
+      await snapGhostToTarget(target);
+      await applyDropToDay(targetDow);
+      await loadData();
+
+      haptic("drop");
+
+      toast(drag.type === "idea"
+        ? `Planned for ${dowLabel(targetDow)}`
+        : `Moved to ${dowLabel(targetDow)}`
+      );
+    }
+  }catch(err){
+    console.error(err);
+    toast("Could not save (server?)");
+  }finally{
+    endDragCleanup();
+  }
+});
+
+document.addEventListener("pointercancel", () => {
+  cancelLongPress();
+  if (drag) endDragCleanup();
+});
+
+/* Clock */
+setInterval(()=>{
+  const n=new Date();
+  $("clockDate").textContent = n.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+  $("clockTime").textContent = n.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+},1000);
+
+/* =========================================================
+   Boot
+========================================================= */
+(async function boot(){
+  try{
+    const ok = await authMe();
+
+    if (ok){
+      await loadSettingsRemote().catch(()=>{});
+      await loadData();
+      setTimeout(showDragHint, 600);
+
+      ensureWsStarted();
+      tickSchedule();
+      scheduleRedim();
+    }else{
+      showAuthOverlay(true);
+    }
+  }catch(err){
+    console.error(err);
+    showAuthOverlay(true);
+    toast("Server not reachable");
+  }
+})();
+</script>
+</body>
+</html>
