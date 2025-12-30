@@ -805,11 +805,11 @@ body[data-ui="phone"] .row{ grid-template-columns: 1fr; }
     <div class="title">Dinner Planner</div>
 
     <div class="topbar-right">
-      <button class="icon-btn" id="openSettings" title="Settings">⚙️</button>
 
       <div class="user-pill">
         <div class="user-name" id="whoami">—</div>
         <div class="user-actions">
+          <button class="icon-btn" id="openSettings" title="Settings">⚙️</button>
           <button class="icon-btn" id="openPrintWeek" title="Print shopping">🧾</button>
           <button class="icon-btn" id="openChangePw" title="Change password">🔒</button>
           <button class="icon-btn hidden" id="openAdmin" title="Admin users">👥</button>
@@ -827,7 +827,7 @@ body[data-ui="phone"] .row{ grid-template-columns: 1fr; }
   <div class="content">
     <div class="left">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:650;color:var(--muted)">Week</div>
+        <div style="font-weight:650;color:var(--muted)">Day of Week</div>
         <div style="display:flex;gap:8px;align-items:center">
             <span id="weekErrorBadge" class="inline-error hidden" aria-hidden="true">Error</span>
           </div>
@@ -908,9 +908,9 @@ body[data-ui="phone"] .row{ grid-template-columns: 1fr; }
   <div class="modal" role="dialog" aria-modal="true" aria-label="Print shopping list">
     <h2>Print Shopping List</h2>
     <div style="max-height:320px;overflow:auto;margin-bottom:8px" id="printDaysList"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-      <button class="btn" id="printCancel">Cancel</button>
-      <button class="btn primary" id="printDo">Print</button>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn danger" id="printCancel">Cancel</button>
+      <button class="btn" id="printDo">Print</button>
     </div>
   </div>
 </div>
