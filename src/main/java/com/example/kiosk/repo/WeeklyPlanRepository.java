@@ -7,4 +7,6 @@ import java.util.*;
 public interface WeeklyPlanRepository extends JpaRepository<WeeklyPlan, Long> {
   List<WeeklyPlan> findByProfileIdOrderByDayOfWeekAsc(Long profileId);
   Optional<WeeklyPlan> findByProfileIdAndDayOfWeek(Long profileId, Integer dayOfWeek);
+  // count how many times an idea is assigned in the weekly plan
+  long countByIdea_Id(Long ideaId);
 }

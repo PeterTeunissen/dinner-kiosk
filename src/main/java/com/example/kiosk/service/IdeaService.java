@@ -15,13 +15,25 @@ public class IdeaService {
     this.repo = repo;
   }
 
+  @Transactional(readOnly = true)
   public List<DinnerIdea> list(Long profileId, boolean archived) {
-    return repo.findByProfileIdAndArchivedOrderByUpdatedAtDesc(profileId, archived);
+    List<DinnerIdea> ideas = repo.findByProfileIdAndArchivedOrderByUpdatedAtDesc(profileId, archived);
+    // Ensure ingredients collection is loaded while within transactional context to avoid
+    // LazyInitializationException during JSON serialization in the controller.
+    ideas.forEach(i -> {
+      if (i.getIngredients() != null) {
+        i.getIngredients().size();
+      }
+    });
+    return ideas;
   }
 
   @Transactional
   public DinnerIdea create(Long profileId, DinnerIdea idea) {
     idea.setProfileId(profileId);
+    if (idea.getIngredients() != null) {
+      idea.getIngredients().forEach(ing -> ing.setDinnerIdea(idea));
+    }
     return repo.save(idea);
   }
 

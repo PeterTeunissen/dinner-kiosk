@@ -24,8 +24,21 @@ public class PlanService {
     this.assignmentRepo = assignmentRepo;
   }
 
+  @Transactional(readOnly = true)
   public List<WeeklyPlan> getWeek(Long profileId) {
-    return weeklyPlanRepo.findByProfileIdOrderByDayOfWeekAsc(profileId);
+    List<WeeklyPlan> list = weeklyPlanRepo.findByProfileIdOrderByDayOfWeekAsc(profileId);
+    for (WeeklyPlan wp : list){
+      // initialize idea proxy within transaction so JSON serialization won't fail later
+      if (wp.getIdea() != null){
+        DinnerIdea idea = wp.getIdea();
+        // touch common fields and ingredients collection so Jackson can serialize cleanly
+        idea.getId();
+        idea.getTitle();
+        idea.getDescription();
+        if (idea.getIngredients() != null) idea.getIngredients().size();
+      }
+    }
+    return list;
   }
 
   @Transactional
@@ -43,6 +56,8 @@ public class PlanService {
     day.setCookMinutes(req.cookMinutes);
     day.setTagsJson(req.tagsJson);
 
+    day.setIdea(null);
+
     return weeklyPlanRepo.save(day);
   }
 
@@ -59,6 +74,7 @@ public class PlanService {
     day.setPrepMinutes(null);
     day.setCookMinutes(null);
     day.setTagsJson(null);
+    day.setIdea(null);
 
     return weeklyPlanRepo.save(day);
   }
@@ -78,6 +94,7 @@ public class PlanService {
     day.setMealDetails(idea.getDescription());
     day.setServings(idea.getDefaultServings());
     day.setTagsJson(idea.getTagsJson());
+    day.setIdea(idea);
 
     WeeklyPlan saved = weeklyPlanRepo.save(day);
 
@@ -93,6 +110,16 @@ public class PlanService {
     if (Boolean.TRUE.equals(req.archiveIdea)) {
       idea.setArchived(true);
       ideaRepo.save(idea);
+    }
+
+    // initialize idea fields/collections within transaction so controller's JSON
+    // serialization does not trigger LazyInitializationException
+    if (saved.getIdea() != null){
+      DinnerIdea si = saved.getIdea();
+      si.getId();
+      si.getTitle();
+      si.getDescription();
+      if (si.getIngredients() != null) si.getIngredients().size();
     }
 
     return saved;

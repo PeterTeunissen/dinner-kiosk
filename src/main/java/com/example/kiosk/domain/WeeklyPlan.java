@@ -46,6 +46,10 @@ public class WeeklyPlan {
   @Column(name="is_locked", nullable=false)
   private boolean locked = false;
 
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "idea_id")
+  private DinnerIdea idea;
+
   @Column(name="created_at", updatable=false, insertable=false)
   private Instant createdAt;
 
@@ -75,4 +79,6 @@ public class WeeklyPlan {
   public void setTagsJson(String tagsJson) { this.tagsJson = tagsJson; }
   public boolean isLocked() { return locked; }
   public void setLocked(boolean locked) { this.locked = locked; }
+  public DinnerIdea getIdea() { return idea; }
+  public void setIdea(DinnerIdea idea) { this.idea = idea; }
 }

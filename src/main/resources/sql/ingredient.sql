@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS ingredient (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  dinner_idea_id BIGINT UNSIGNED NOT NULL,
+
+  amount FLOAT NULL,
+  unit VARCHAR(80) NULL,
+  description TEXT NULL,
+
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (id),
+  KEY idx_ing_idea (dinner_idea_id),
+  CONSTRAINT fk_ingredient_idea
+    FOREIGN KEY (dinner_idea_id) REFERENCES dinner_idea(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB;

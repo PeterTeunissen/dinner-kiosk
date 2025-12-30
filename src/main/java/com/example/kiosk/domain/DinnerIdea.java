@@ -1,7 +1,10 @@
 package com.example.kiosk.domain;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name="dinner_idea", indexes = {
@@ -41,6 +44,10 @@ public class DinnerIdea {
   @Column(name="updated_at", insertable=false, updatable=false)
   private Instant updatedAt;
 
+  @OneToMany(mappedBy = "dinnerIdea", cascade = CascadeType.ALL, orphanRemoval = true)
+  @JsonManagedReference
+  private List<Ingredient> ingredients = new ArrayList<>();
+
   // getters/setters
   public Long getId() { return id; }
   public Long getProfileId() { return profileId; }
@@ -57,4 +64,22 @@ public class DinnerIdea {
   public void setSourceUrl(String sourceUrl) { this.sourceUrl = sourceUrl; }
   public boolean isArchived() { return archived; }
   public void setArchived(boolean archived) { this.archived = archived; }
+
+  public List<Ingredient> getIngredients() { return ingredients; }
+  public void setIngredients(List<Ingredient> ingredients) {
+    this.ingredients.clear();
+    if (ingredients != null) {
+      ingredients.forEach(this::addIngredient);
+    }
+  }
+
+  public void addIngredient(Ingredient ing) {
+    ing.setDinnerIdea(this);
+    this.ingredients.add(ing);
+  }
+
+  public void removeIngredient(Ingredient ing) {
+    ing.setDinnerIdea(null);
+    this.ingredients.remove(ing);
+  }
 }
