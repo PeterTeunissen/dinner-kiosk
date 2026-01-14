@@ -1,19 +1,23 @@
 package com.example.kiosk.api.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 
 public class UpdateDayRequest {
-  @NotNull @Min(1) @Max(7)
-  public Integer dayOfWeek;
+	@NotNull
+	@Min(1)
+	@Max(7)
+	public Integer dayOfWeek;
 
-  public String mealTitle;
-  public String mealDetails;
-  public String notes;
+	public String mealTitle;
+	public String mealDetails;
+	public String notes;
 
-  public Integer servings;
-  public Integer prepMinutes;
-  public Integer cookMinutes;
+	public Integer servings;
+	public Integer prepMinutes;
+	public Integer cookMinutes;
 
-  // example: ["quick","crockpot"]
-  public String tagsJson;
+	// example: ["quick","crockpot"]
+	public String tagsJson;
 }
