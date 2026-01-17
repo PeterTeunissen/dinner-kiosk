@@ -1,0 +1,74 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-app-settings-table
+      author: system
+      changes:
+        - createTable:
+            tableName: app_settings
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: week_start
+                  type: ENUM('SUN','MON')
+                  defaultValue: 'SUN'
+                  constraints:
+                    nullable: false
+              - column:
+                  name: dim_enabled
+                  type: BIT
+                  defaultValue: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: dim_start
+                  type: TIME
+                  defaultValue: '22:30:00'
+                  constraints:
+                    nullable: false
+              - column:
+                  name: dim_end
+                  type: TIME
+                  defaultValue: '07:30:00'
+                  constraints:
+                    nullable: false
+              - column:
+                  name: dim_opacity
+                  type: DECIMAL(3,2)
+                  defaultValue: 0.55
+                  constraints:
+                    nullable: false
+              - column:
+                  name: dim_inactivity_minutes
+                  type: INT
+                  defaultValue: 5
+                  constraints:
+                    nullable: false
+              - column:
+                  name: pin_hash
+                  type: VARCHAR(255)
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValue: 0
+                  constraints:
+                    nullable: false
+            remarks: Application settings (singleton)
+  - changeSet:
+      id: 003-insert-default-settings
+      author: system
+      preConditions:
+        - onFail: MARK_RAN
+      changes:
+        - sql:
+            sql: "INSERT INTO app_settings (id) VALUES (1) ON DUPLICATE KEY UPDATE id=id"

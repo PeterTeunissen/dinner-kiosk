@@ -1,0 +1,46 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-app-user-role-table
+      author: system
+      changes:
+        - createTable:
+            tableName: app_user_role
+            columns:
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role
+                  type: VARCHAR(40)
+                  constraints:
+                    nullable: false
+            remarks: User roles mapping table
+        - addPrimaryKey:
+            tableName: app_user_role
+            columnNames: user_id,role
+            constraintName: pk_app_user_role
+        - addForeignKeyConstraint:
+            baseTableName: app_user_role
+            baseColumnNames: user_id
+            referencedTableName: app_user
+            referencedColumnNames: id
+            constraintName: fk_user_role_user
+            onDelete: CASCADE
+        - createIndex:
+            tableName: app_user_role
+            indexName: idx_user_role_role
+            columns:
+              - column:
+                  name: role
+  - changeSet:
+      id: 002-insert-admin-roles
+      author: system
+      preConditions:
+        - onFail: MARK_RAN
+      changes:
+        - sql:
+            sql: "INSERT INTO app_user_role (user_id, role) SELECT id, 'ROLE_ADMIN' FROM app_user WHERE username='admin' ON DUPLICATE KEY UPDATE role=role"
+        - sql:
+            sql: "INSERT INTO app_user_role (user_id, role) SELECT id, 'ROLE_USER' FROM app_user WHERE username='admin' ON DUPLICATE KEY UPDATE role=role"

@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/001-create-app-user-table.yaml
+  - include:
+      file: db/changelog/002-create-app-user-role-table.yaml
+  - include:
+      file: db/changelog/003-create-app-settings-table.yaml
+  - include:
+      file: db/changelog/004-create-dinner-idea-table.yaml
+  - include:
+      file: db/changelog/005-create-ingredient-table.yaml
+  - include:
+      file: db/changelog/006-create-plan-assignment-table.yaml
+  - include:
+      file: db/changelog/007-create-weekly-plan-table.yaml

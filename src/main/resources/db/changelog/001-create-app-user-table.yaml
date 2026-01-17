@@ -1,0 +1,62 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-app-user-table
+      author: system
+      changes:
+        - createTable:
+            tableName: app_user
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: username
+                  type: VARCHAR(80)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: password_hash
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BIT
+                  defaultValue: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: failed_attempts
+                  type: INT
+                  defaultValue: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: locked_until
+                  type: DATETIME
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+            remarks: Application users table
+  - changeSet:
+      id: 001-insert-admin-user
+      author: system
+      preConditions:
+        - onFail: MARK_RAN
+      changes:
+        - sql:
+            sql: "INSERT INTO app_user (username, password_hash, enabled) VALUES ('admin', '$2a$10$REPLACE_WITH_REAL_BCRYPT_HASH', 1) ON DUPLICATE KEY UPDATE username=username"

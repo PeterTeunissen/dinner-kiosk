@@ -1,0 +1,58 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-create-plan-assignment-table
+      author: system
+      changes:
+        - createTable:
+            tableName: plan_assignment
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT UNSIGNED
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: BIGINT UNSIGNED
+                  defaultValue: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: day_of_week
+                  type: INT UNSIGNED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: idea_id
+                  type: BIGINT UNSIGNED
+              - column:
+                  name: meal_title_snapshot
+                  type: VARCHAR(120)
+              - column:
+                  name: assigned_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+            remarks: Meal plan assignments
+        - addForeignKeyConstraint:
+            baseTableName: plan_assignment
+            baseColumnNames: idea_id
+            referencedTableName: dinner_idea
+            referencedColumnNames: id
+            constraintName: fk_assignment_idea
+            onDelete: SET NULL
+        - createIndex:
+            tableName: plan_assignment
+            indexName: idx_assign_profile_day
+            columns:
+              - column:
+                  name: profile_id
+              - column:
+                  name: day_of_week
+              - column:
+                  name: assigned_at
+        - sql:
+            sql: "ALTER TABLE plan_assignment ADD CONSTRAINT chk_assignment_day CHECK (day_of_week BETWEEN 1 AND 7)"

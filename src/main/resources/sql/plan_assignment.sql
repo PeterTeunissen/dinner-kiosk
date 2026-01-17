@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS plan_assignment (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   profile_id BIGINT UNSIGNED NOT NULL DEFAULT 1,
 
-  day_of_week TINYINT UNSIGNED NOT NULL,                -- 1..7
+  day_of_week INT UNSIGNED NOT NULL,                -- 1..7
   idea_id BIGINT UNSIGNED NULL,                         -- nullable if user typed custom meal
   meal_title_snapshot VARCHAR(120) NULL,                -- store what was planned at that time
 

@@ -1,0 +1,96 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-create-weekly-plan-table
+      author: system
+      changes:
+        - createTable:
+            tableName: weekly_plan
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT UNSIGNED
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: profile_id
+                  type: BIGINT UNSIGNED
+                  defaultValue: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: day_of_week
+                  type: INT UNSIGNED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: idea_id
+                  type: BIGINT UNSIGNED
+              - column:
+                  name: meal_title
+                  type: VARCHAR(120)
+              - column:
+                  name: meal_details
+                  type: TINYTEXT
+              - column:
+                  name: notes
+                  type: TINYTEXT
+              - column:
+                  name: servings
+                  type: INT UNSIGNED
+              - column:
+                  name: prep_minutes
+                  type: INT UNSIGNED
+              - column:
+                  name: cook_minutes
+                  type: INT UNSIGNED
+              - column:
+                  name: tags_json
+                  type: JSON
+              - column:
+                  name: is_locked
+                  type: TINYINT(1)
+                  defaultValue: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+            remarks: Weekly meal plans
+        - addUniqueConstraint:
+            tableName: weekly_plan
+            columnNames: profile_id,day_of_week
+            constraintName: uq_weekly_plan_profile_day
+        - addForeignKeyConstraint:
+            baseTableName: weekly_plan
+            baseColumnNames: idea_id
+            referencedTableName: dinner_idea
+            referencedColumnNames: id
+            constraintName: fk_weekly_plan_idea
+            onDelete: SET NULL
+        - createIndex:
+            tableName: weekly_plan
+            indexName: idx_weekly_plan_idea
+            columns:
+              - column:
+                  name: idea_id
+        - sql:
+            sql: "ALTER TABLE weekly_plan ADD CONSTRAINT chk_day_of_week CHECK (day_of_week BETWEEN 1 AND 7)"
+  - changeSet:
+      id: 007-insert-default-weekly-plan
+      author: system
+      preConditions:
+        - onFail: MARK_RAN
+      changes:
+        - sql:
+            sql: "INSERT INTO weekly_plan (profile_id, day_of_week) VALUES (1,1),(1,2),(1,3),(1,4),(1,5),(1,6),(1,7) ON DUPLICATE KEY UPDATE day_of_week = VALUES(day_of_week)"

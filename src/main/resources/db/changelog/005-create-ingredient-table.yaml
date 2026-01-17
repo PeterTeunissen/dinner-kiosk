@@ -1,0 +1,55 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-create-ingredient-table
+      author: system
+      changes:
+        - createTable:
+            tableName: ingredient
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT UNSIGNED
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: dinner_idea_id
+                  type: BIGINT UNSIGNED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: amount
+                  type: FLOAT
+              - column:
+                  name: unit
+                  type: VARCHAR(80)
+              - column:
+                  name: description
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+            remarks: Ingredients for dinner ideas
+        - addForeignKeyConstraint:
+            baseTableName: ingredient
+            baseColumnNames: dinner_idea_id
+            referencedTableName: dinner_idea
+            referencedColumnNames: id
+            constraintName: fk_ingredient_idea
+            onDelete: CASCADE
+        - createIndex:
+            tableName: ingredient
+            indexName: idx_ing_idea
+            columns:
+              - column:
+                  name: dinner_idea_id
