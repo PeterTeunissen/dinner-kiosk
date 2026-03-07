@@ -177,11 +177,17 @@ body.dragging{ touch-action:none; overflow:hidden; }
   gap:14px;
 }
 
+/* When read-only is enabled, use full width for the day list (ideas panel is hidden) */
+.read-only .content{
+  grid-template-columns: 1fr;
+}
+
 /* LEFT */
 .left{
   min-height:0;
   display:grid;
-  grid-template-rows: 1fr;
+  /* header should only take its natural height; days should fill remaining space */
+  grid-template-rows: auto 1fr;
 }
 
 /* Days (kiosk/tablet: always 7 visible) */
@@ -294,6 +300,16 @@ body[data-theme="farmhouse"] .day-row{
   display:flex;
   flex-direction:column;
   gap:10px;
+}
+
+/* When read-only mode is enabled, hide the ideas list entirely */
+.read-only .ideas-panel{
+  display:none;
+}
+
+/* Hide user action buttons (settings/logout/etc) in read-only mode */
+.read-only .user-actions{
+  display:none;
 }
 
 .ideas-header{
@@ -1101,6 +1117,15 @@ body[data-ui="phone"] .row{ grid-template-columns: 1fr; }
 <script>
 const API="/api";
 
+// When the URL includes ?readOnly=true (or =1/yes), hide day edit/clear actions.
+const READ_ONLY = (() => {
+  const v = new URLSearchParams(window.location.search).get("readOnly");
+  return v && ["1","true","yes"].includes(String(v).toLowerCase());
+})();
+if (READ_ONLY){
+  document.documentElement.classList.add('read-only');
+}
+
 /* Local fallback defaults */
 const CONFIG_DEFAULTS = {
   weekStart: "SUN",
@@ -1547,10 +1572,12 @@ function render(){
       <div class="day-label">${dowLabel(d.dayOfWeek)}</div>
       <div class="meal ${d.mealTitle ? "" : "empty"}">${safeText(d.mealTitle || "—")}</div>
       <div class="notes">${safeText(d.notes || "")}</div>
+      ${READ_ONLY ? "" : `
       <div class="day-actions">
         <button class="btn" data-edit="${d.dayOfWeek}" title="Edit">✏️</button>
         <button class="btn danger" data-clear="${d.dayOfWeek}" title="Clear">🗑</button>
       </div>
+      `}
     `;
     days.appendChild(row);
   });
@@ -2075,6 +2102,7 @@ document.addEventListener("click", async (e) => {
 
   const edit = e.target.dataset.edit;
   if (edit){
+    if (READ_ONLY) return;
     editDow = Number(edit);
     const d = week.find(x => x.dayOfWeek === editDow);
     $("modalDay").textContent = dowLabel(editDow);
@@ -2086,6 +2114,7 @@ document.addEventListener("click", async (e) => {
 
   const clr = e.target.dataset.clear;
   if (clr){
+    if (READ_ONLY) return;
     await api("/day/" + clr, { method:"DELETE" });
     await loadData();
     toast("Cleared");
